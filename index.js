@@ -18,6 +18,10 @@ app.use(cors());
 
 const PORT = process.env.PORT || 8080;
 
+app.get("/", (req, res) => {
+  res.send("👋 Welcome to Saylani Roti Bank Virtual Assistant!");
+}); 
+
 app.post("/webhook", async (req, res) => {
   const agent = new WebhookClient({ request: req, response: res });
   console.log("🔔 Dialogflow Webhook Triggered");
