@@ -18,6 +18,13 @@ app.use(cors());
 
 const PORT = process.env.PORT || 8080;
 
+console.log("Loaded ENV:", {
+  EMAIL_USER: process.env.EMAIL_USER,
+  TWILIO_SID: process.env.TWILIO_SID,
+  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
+  PORT: PORT
+});
+
 app.get("/", (req, res) => {
   res.send("👋 Welcome to Saylani Roti Bank Virtual Assistant!");
 }); 
@@ -86,12 +93,22 @@ app.post("/webhook", async (req, res) => {
       console.log("✅ Email sent to:", email);
     } catch (err) {
       emailError = err.message;
-      console.error("❌ Email Error:", err.message);
+      console.error("❌ Email Error:", err);
     }
 
+    // WhatsApp sending logic with sandbox/business number check
+    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+    const isSandbox = twilioFrom === "+14155238886";
+    if (isSandbox) {
+      // Twilio sandbox: remind user to join sandbox
+      console.log("[Twilio Sandbox] Make sure recipient has joined the sandbox by sending the join code to +14155238886");
+    } else {
+      // Business number: must be approved by Twilio
+      console.log("[Twilio Business] Using approved WhatsApp business number.");
+    }
     try {
       await twilioClient.messages.create({
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: `whatsapp:${twilioFrom}`,
         to: `whatsapp:+${phone}`,
         body: messageText,
       });
@@ -99,8 +116,17 @@ app.post("/webhook", async (req, res) => {
       console.log("✅ WhatsApp sent to:", phone);
     } catch (err) {
       whatsappError = err.message;
-      console.error("❌ WhatsApp Error:", err.message);
+      if (err.message && err.message.includes("not a valid phone number")) {
+        whatsappError +=
+          isSandbox
+            ? " (Twilio Sandbox: Make sure the recipient has joined the sandbox by sending the join code to +14155238886)"
+            : " (Your Twilio WhatsApp sender number is not approved. Use a valid business number or the sandbox number.)";
+      }
+      console.error("❌ WhatsApp Error:", err);
     }
+    // ✅ ✅ 🔽 Add these lines here
+    console.log("WHATSAPP SENT STATUS:", whatsappSent);
+    console.log("EMAIL SENT STATUS:", emailSent);
 
     if (emailSent && whatsappSent) {
       agent.add(`🌟 Thank you, ${name}! Your ${donationType} of ${amount} has been recorded.
@@ -120,6 +146,42 @@ Confirmation sent to ${email} and WhatsApp +${phone}. May Allah bless you! 🤲`
   intentMap.set("Donate", donate);
 
   agent.handleRequest(intentMap);
+});
+
+app.get("/test-email", async (req, res) => {
+  const testEmail = req.query.email || process.env.EMAIL_USER;
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+  try {
+    await transporter.sendMail({
+      from: `Saylani Roti Bank <${process.env.EMAIL_USER}>`,
+      to: testEmail,
+      subject: "Test Email",
+      text: "This is a test email from Saylani Roti Bank server.",
+    });
+    res.send("✅ Test email sent to: " + testEmail);
+  } catch (err) {
+    res.status(500).send("❌ Email Error: " + err.message);
+  }
+});
+
+app.get("/test-whatsapp", async (req, res) => {
+  const testPhone = req.query.phone || "923001234567"; // Change to your test number
+  try {
+    await twilioClient.messages.create({
+      from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+      to: `whatsapp:+${testPhone}`,
+      body: "This is a test WhatsApp message from Saylani Roti Bank server.",
+    });
+    res.send("✅ Test WhatsApp sent to: +" + testPhone);
+  } catch (err) {
+    res.status(500).send("❌ WhatsApp Error: " + err.message);
+  }
 });
 
 app.listen(PORT, () => {

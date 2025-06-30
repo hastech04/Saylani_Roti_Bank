@@ -1,8 +1,9 @@
 const twilio = require('twilio');
 
-// Replace with your real Twilio credentials
-const accountSid = process.env.TWILIO_SID ;
-const authToken = process.env.TWILIO_AUTH;
+// Use correct environment variable names
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioFrom = process.env.TWILIO_PHONE_NUMBER; // Should be like +14155238886
 const client = twilio(accountSid, authToken);
 
 /**
@@ -13,7 +14,7 @@ const client = twilio(accountSid, authToken);
 async function sendWhatsAppMessage(toPhone, message) {
   try {
     const result = await client.messages.create({
-      from: 'whatsapp:+14155238886', // Twilio sandbox WhatsApp number
+      from: `whatsapp:${twilioFrom}`,
       to: `whatsapp:+${toPhone}`,
       body: message,
     });
